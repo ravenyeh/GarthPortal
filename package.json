@@ -8,6 +8,6 @@
     "build": "echo 'Static site - no build required'"
   },
   "dependencies": {
-    "garmin-connect": "github:ravenyeh/garmin-connect"
+    "garmin-connect": "github:ravenyeh/garmin-connect#b2718bf"
   }
 }

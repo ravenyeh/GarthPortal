@@ -25,19 +25,7 @@ module.exports = async (req, res) => {
     };
 
     try {
-        const { email, password, mfaSession, mfaCode, mfaSecretKey } = req.body;
-
-        // Allow MFA_SECRET_KEY from request body (overrides env var)
-        if (mfaSecretKey && mfaSecretKey.length >= 32) {
-            process.env.MFA_SECRET_KEY = mfaSecretKey;
-            log('MFA_SECRET_KEY set from request');
-        } else if (mfaSecretKey) {
-            return res.status(400).json({
-                success: false,
-                error: 'MFA Secret Key 必須至少 32 字元',
-                debug: { logs }
-            });
-        }
+        const { email, password, mfaSession, mfaCode } = req.body;
 
         // Step 2: MFA verification
         if (mfaSession && mfaCode) {
@@ -61,9 +49,6 @@ module.exports = async (req, res) => {
                     sessionExpired = true;
                 } else if (msg.includes('invalid') && msg.includes('session')) {
                     errorMessage = 'Session 無效，請重新登入';
-                    sessionExpired = true;
-                } else if (msg.includes('mfa_secret_key')) {
-                    errorMessage = '伺服器 MFA 設定錯誤';
                     sessionExpired = true;
                 } else if (msg.includes('code') || msg.includes('invalid')) {
                     errorMessage = '驗證碼錯誤，請重新輸入';
@@ -129,9 +114,7 @@ module.exports = async (req, res) => {
 
         if (error.message) {
             const msg = error.message.toLowerCase();
-            if (msg.includes('mfa_secret_key')) {
-                errorMessage = '伺服器缺少 MFA_SECRET_KEY 環境變數，請在 Vercel 設定';
-            } else if (msg.includes('429') || msg.includes('too many')) {
+            if (msg.includes('429') || msg.includes('too many')) {
                 errorMessage = '請求過於頻繁，請等待幾分鐘後再試';
             } else if (msg.includes('credentials') || msg.includes('password') || msg.includes('401')) {
                 errorMessage = 'Email 或密碼錯誤';
