@@ -17,16 +17,27 @@ module.exports = async (req, res) => {
         return res.status(405).json({ error: 'Method not allowed' });
     }
 
+    const logs = [];
+    const log = (msg) => {
+        const ts = new Date().toISOString().slice(11, 23);
+        logs.push(`[${ts}] ${msg}`);
+        console.log(msg);
+    };
+
     try {
         const { email, password, mfaSession, mfaCode } = req.body;
 
         // Step 2: MFA verification
         if (mfaSession && mfaCode) {
+            log('Step 2: MFA verification');
             const GC = new GarminConnect({ username: '', password: '' });
 
             try {
+                log('Calling GC.verifyMFA()...');
                 await GC.verifyMFA(mfaSession, mfaCode);
+                log('MFA verified successfully');
             } catch (e) {
+                log(`MFA error: ${e.message}`);
                 const msg = e.message.toLowerCase();
                 let errorMessage = 'MFA 驗證失敗';
                 let sessionExpired = false;
@@ -47,44 +58,58 @@ module.exports = async (req, res) => {
                 return res.status(401).json({
                     success: false,
                     error: errorMessage,
+                    debug: { rawError: e.message, logs },
                     sessionExpired
                 });
             }
 
-            // MFA verified, return tokens
-            return await returnTokens(GC, res);
+            return await returnTokens(GC, res, logs, log);
         }
 
         // Step 1: Login with credentials
         if (!email || !password) {
             return res.status(400).json({
                 success: false,
-                error: '請提供 Email 和密碼'
+                error: '請提供 Email 和密碼',
+                debug: { logs }
             });
         }
+
+        log(`Step 1: Login for ${email}`);
+        log('Creating GarminConnect instance...');
 
         const GC = new GarminConnect({
             username: email,
             password: password
         });
 
+        log('GarminConnect instance created');
+        log('Calling GC.login()...');
+
         const loginResult = await GC.login();
+
+        log(`Login returned: ${typeof loginResult}`);
+        log(`Login result keys: ${loginResult ? Object.keys(loginResult).join(', ') : 'null'}`);
+        log(`needsMFA: ${loginResult?.needsMFA}`);
 
         // Check if MFA is required
         if (loginResult && loginResult.needsMFA) {
+            log('MFA required, returning mfaSession');
             return res.status(200).json({
                 success: false,
                 needsMfa: true,
                 mfaSession: loginResult.mfaSession,
-                message: '請輸入 Garmin 傳送的驗證碼'
+                message: '請輸入 Garmin 傳送的驗證碼',
+                debug: { logs }
             });
         }
 
-        // No MFA needed, return tokens directly
-        return await returnTokens(GC, res);
+        log('Login successful (no MFA needed)');
+        return await returnTokens(GC, res, logs, log);
 
     } catch (error) {
-        console.error('Garmin auth error:', error.message);
+        log(`ERROR: ${error.message}`);
+        log(`Stack: ${error.stack?.split('\n').slice(0, 3).join(' | ')}`);
 
         let errorMessage = '登入失敗';
 
@@ -101,20 +126,27 @@ module.exports = async (req, res) => {
 
         return res.status(401).json({
             success: false,
-            error: errorMessage
+            error: errorMessage,
+            debug: { rawError: error.message, stack: error.stack?.split('\n').slice(0, 5), logs }
         });
     }
 };
 
 // Return OAuth tokens and user profile
-async function returnTokens(GC, res) {
+async function returnTokens(GC, res, logs, log) {
+    log('Fetching tokens...');
     const oauth1Token = GC.client?.oauth1Token || null;
     const oauth2Token = GC.client?.oauth2Token || null;
+
+    log(`OAuth1 token: ${oauth1Token ? 'present' : 'null'}`);
+    log(`OAuth2 token: ${oauth2Token ? 'present' : 'null'}`);
 
     // Get user profile
     let user = null;
     try {
+        log('Fetching user profile...');
         const userProfile = await GC.getUserProfile();
+        log(`User profile: ${userProfile?.displayName || 'unknown'}`);
 
         let socialProfile = null;
         if (userProfile.displayName) {
@@ -122,7 +154,7 @@ async function returnTokens(GC, res) {
                 const socialUrl = `https://connect.garmin.com/modern/proxy/userprofile-service/socialProfile/${userProfile.displayName}`;
                 socialProfile = await GC.get(socialUrl);
             } catch (e) {
-                // Social profile fetch is optional
+                log(`Social profile fetch failed: ${e.message}`);
             }
         }
 
@@ -132,8 +164,10 @@ async function returnTokens(GC, res) {
             profileImageUrl: socialProfile?.profileImageUrlSmall || userProfile.profileImageUrlSmall || null
         };
     } catch (e) {
-        // User profile fetch is optional
+        log(`User profile fetch failed: ${e.message}`);
     }
+
+    log('Done!');
 
     return res.status(200).json({
         success: true,
@@ -150,6 +184,7 @@ async function returnTokens(GC, res) {
                 expires_at: oauth2Token.expires_at || oauth2Token.expiresAt || null
             } : null
         },
-        user
+        user,
+        debug: { logs }
     });
 }

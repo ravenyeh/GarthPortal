@@ -98,6 +98,22 @@
 
         .action-buttons { display: flex; gap: 12px; margin-top: 16px; }
 
+        /* Debug Console */
+        .debug-card { margin-top: 8px; }
+        .debug-card h2 { font-size: 16px; cursor: pointer; user-select: none; }
+        .debug-card h2::before { content: "▶ "; font-size: 12px; }
+        .debug-card h2.open::before { content: "▼ "; }
+        #debug-log {
+            background: #1e1e1e; color: #d4d4d4; border-radius: 8px;
+            padding: 12px; font-family: "SF Mono", "Fira Code", monospace;
+            font-size: 12px; line-height: 1.6; max-height: 300px;
+            overflow-y: auto; white-space: pre-wrap; word-break: break-all;
+        }
+        #debug-log .log-time { color: #6a9955; }
+        #debug-log .log-error { color: #f44747; }
+        #debug-log .log-info { color: #569cd6; }
+        #debug-log .log-success { color: #4ec9b0; }
+
         .status-bar {
             position: fixed; bottom: 24px; left: 50%;
             transform: translateX(-50%); padding: 12px 24px;
@@ -228,6 +244,12 @@
             </div>
         </div>
 
+        <!-- Debug Console -->
+        <div id="debug-section" class="card debug-card">
+            <h2 id="debug-toggle" class="open">Debug Log</h2>
+            <div id="debug-log"></div>
+        </div>
+
         <!-- Status Messages -->
         <div id="status-bar" class="status-bar hidden"></div>
     </div>
@@ -247,6 +269,38 @@
         const newLoginBtn = document.getElementById("new-login-btn");
 
         let mfaSession = null;
+        const debugLog = document.getElementById("debug-log");
+        const debugToggle = document.getElementById("debug-toggle");
+
+        debugToggle.addEventListener("click", () => {
+            debugToggle.classList.toggle("open");
+            debugLog.style.display = debugToggle.classList.contains("open") ? "block" : "none";
+        });
+
+        function debugAppend(msg, type) {
+            const ts = new Date().toLocaleTimeString();
+            const line = document.createElement("div");
+            line.innerHTML = '<span class="log-time">[' + ts + ']</span> ' +
+                '<span class="log-' + (type || 'info') + '">' + escapeHtml(msg) + '</span>';
+            debugLog.appendChild(line);
+            debugLog.scrollTop = debugLog.scrollHeight;
+        }
+
+        function debugShowServerLogs(data) {
+            if (data.debug && data.debug.logs) {
+                data.debug.logs.forEach(l => debugAppend("SERVER: " + l, "info"));
+            }
+            if (data.debug && data.debug.rawError) {
+                debugAppend("SERVER ERROR: " + data.debug.rawError, "error");
+            }
+            if (data.debug && data.debug.stack) {
+                data.debug.stack.forEach(l => debugAppend("  " + l, "error"));
+            }
+        }
+
+        function escapeHtml(s) {
+            return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+        }
 
         let statusTimeout;
         function showStatus(message, type) {
@@ -335,27 +389,33 @@
             }
 
             setLoading(loginBtn, true);
+            debugAppend("POST /api/garmin/auth  { email: " + email + " }", "info");
             try {
                 const res = await fetch("/api/garmin/auth", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ email, password }),
                 });
+                debugAppend("Response status: " + res.status, res.ok ? "success" : "error");
                 const data = await res.json();
+                debugShowServerLogs(data);
 
                 if (data.needsMfa) {
                     mfaSession = data.mfaSession;
+                    debugAppend("MFA required, session received", "info");
                     showStatus(data.message || "請輸入驗證碼", "info");
                     showSection("mfa");
                     document.getElementById("mfa-code").focus();
                 } else if (data.success) {
+                    debugAppend("Login success!", "success");
                     showStatus("登入成功！", "success");
                     displayTokens(data);
                 } else {
+                    debugAppend("Login failed: " + (data.error || "unknown"), "error");
                     showStatus(data.error || "登入失敗", "error");
                 }
             } catch (err) {
-                console.error("Login error:", err);
+                debugAppend("Fetch error: " + err.message, "error");
                 showStatus("無法連線伺服器: " + err.message, "error");
             } finally {
                 setLoading(loginBtn, false);
@@ -372,27 +432,33 @@
             }
 
             setLoading(mfaBtn, true);
+            debugAppend("POST /api/garmin/auth  { mfaCode: " + mfaCode + " }", "info");
             try {
                 const res = await fetch("/api/garmin/auth", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ mfaSession, mfaCode }),
                 });
+                debugAppend("Response status: " + res.status, res.ok ? "success" : "error");
                 const data = await res.json();
+                debugShowServerLogs(data);
 
                 if (data.success) {
+                    debugAppend("MFA verified! Tokens received", "success");
                     showStatus("驗證成功！Token 已取得", "success");
                     displayTokens(data);
                     mfaSession = null;
                 } else {
+                    debugAppend("MFA failed: " + (data.error || "unknown"), "error");
                     showStatus(data.error || "MFA 驗證失敗", "error");
                     if (data.sessionExpired) {
+                        debugAppend("Session expired, returning to login", "error");
                         mfaSession = null;
                         showSection("login");
                     }
                 }
             } catch (err) {
-                console.error("MFA error:", err);
+                debugAppend("Fetch error: " + err.message, "error");
                 showStatus("無法連線伺服器: " + err.message, "error");
             } finally {
                 setLoading(mfaBtn, false);
