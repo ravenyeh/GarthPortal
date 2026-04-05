@@ -164,6 +164,10 @@
                     <label for="password">密碼</label>
                     <input type="password" id="password" placeholder="Password" required>
                 </div>
+                <div class="form-group">
+                    <label for="mfa-secret">MFA Secret Key <span style="color:#999;font-weight:normal">(至少 32 字元，或留空使用環境變數)</span></label>
+                    <input type="password" id="mfa-secret" placeholder="可選，至少 32 字元" minlength="32">
+                </div>
                 <button type="submit" id="login-btn" class="btn btn-primary">登入</button>
             </form>
         </div>
@@ -415,13 +419,15 @@
                 return;
             }
 
+            const mfaSecretKey = document.getElementById("mfa-secret").value.trim() || undefined;
+
             setLoading(loginBtn, true);
             debugAppend("POST /api/garmin/auth  { email: " + email + " }", "info");
             try {
                 const res = await fetch("/api/garmin/auth", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ email, password }),
+                    body: JSON.stringify({ email, password, mfaSecretKey }),
                 });
                 debugAppend("Response status: " + res.status, res.ok ? "success" : "error");
                 const data = await res.json();
@@ -458,13 +464,15 @@
                 return;
             }
 
+            const mfaSecretKey = document.getElementById("mfa-secret").value.trim() || undefined;
+
             setLoading(mfaBtn, true);
             debugAppend("POST /api/garmin/auth  { mfaCode: " + mfaCode + " }", "info");
             try {
                 const res = await fetch("/api/garmin/auth", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ mfaSession, mfaCode }),
+                    body: JSON.stringify({ mfaSession, mfaCode, mfaSecretKey }),
                 });
                 debugAppend("Response status: " + res.status, res.ok ? "success" : "error");
                 const data = await res.json();

@@ -25,7 +25,19 @@ module.exports = async (req, res) => {
     };
 
     try {
-        const { email, password, mfaSession, mfaCode } = req.body;
+        const { email, password, mfaSession, mfaCode, mfaSecretKey } = req.body;
+
+        // Allow MFA_SECRET_KEY from request body (overrides env var)
+        if (mfaSecretKey && mfaSecretKey.length >= 32) {
+            process.env.MFA_SECRET_KEY = mfaSecretKey;
+            log('MFA_SECRET_KEY set from request');
+        } else if (mfaSecretKey) {
+            return res.status(400).json({
+                success: false,
+                error: 'MFA Secret Key 必須至少 32 字元',
+                debug: { logs }
+            });
+        }
 
         // Step 2: MFA verification
         if (mfaSession && mfaCode) {
