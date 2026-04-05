@@ -27,6 +27,11 @@ module.exports = async (req, res) => {
     try {
         const { email, password, mfaSession, mfaCode } = req.body;
 
+        // Check MFA_SECRET_KEY
+        if (!process.env.MFA_SECRET_KEY) {
+            log('WARNING: MFA_SECRET_KEY not set');
+        }
+
         // Step 2: MFA verification
         if (mfaSession && mfaCode) {
             log('Step 2: MFA verification');
