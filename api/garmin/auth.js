@@ -142,8 +142,17 @@ async function returnTokens(GC, res, logs, log) {
     const oauth1Token = GC.client?.oauth1Token || null;
     const oauth2Token = GC.client?.oauth2Token || null;
 
-    log(`OAuth1 token: ${oauth1Token ? 'present' : 'null'}`);
-    log(`OAuth2 token: ${oauth2Token ? 'present' : 'null'}`);
+    log(`OAuth1 token: ${oauth1Token ? 'present (' + Object.keys(oauth1Token).join(',') + ')' : 'null'}`);
+    log(`OAuth2 token: ${oauth2Token ? 'present (' + Object.keys(oauth2Token).join(',') + ')' : 'null'}`);
+
+    // Also try exportToken()
+    let exportedTokens = null;
+    try {
+        exportedTokens = GC.exportToken();
+        log(`exportToken keys: ${exportedTokens ? Object.keys(exportedTokens).join(',') : 'null'}`);
+    } catch (e) {
+        log(`exportToken failed: ${e.message}`);
+    }
 
     // Get user profile
     let user = null;
@@ -173,21 +182,28 @@ async function returnTokens(GC, res, logs, log) {
 
     log('Done!');
 
+    // Build token response - include all available fields
+    const tokens = {
+        oauth1: null,
+        oauth2: null
+    };
+
+    if (oauth1Token) {
+        tokens.oauth1 = { ...oauth1Token };
+    } else if (exportedTokens?.oauth1) {
+        tokens.oauth1 = { ...exportedTokens.oauth1 };
+    }
+
+    if (oauth2Token) {
+        tokens.oauth2 = { ...oauth2Token };
+    } else if (exportedTokens?.oauth2) {
+        tokens.oauth2 = { ...exportedTokens.oauth2 };
+    }
+
     return res.status(200).json({
         success: true,
         message: '登入成功！',
-        tokens: {
-            oauth1: oauth1Token ? {
-                oauth_token: oauth1Token.oauth_token || oauth1Token.oauthToken || null,
-                oauth_token_secret: oauth1Token.oauth_token_secret || oauth1Token.oauthTokenSecret || null
-            } : null,
-            oauth2: oauth2Token ? {
-                access_token: oauth2Token.access_token || oauth2Token.accessToken || null,
-                refresh_token: oauth2Token.refresh_token || oauth2Token.refreshToken || null,
-                token_type: oauth2Token.token_type || oauth2Token.tokenType || null,
-                expires_at: oauth2Token.expires_at || oauth2Token.expiresAt || null
-            } : null
-        },
+        tokens,
         user,
         debug: { logs }
     });

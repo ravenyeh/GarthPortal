@@ -188,58 +188,9 @@
         <div id="token-section" class="card hidden">
             <h2>登入成功</h2>
             <div id="user-info" class="info-box"></div>
-
-            <div class="token-group" id="oauth1-group">
-                <h3>OAuth1 Token</h3>
-                <div class="token-field">
-                    <label>Token</label>
-                    <div class="token-value-row">
-                        <input type="text" id="oauth1-token" readonly>
-                        <button class="btn btn-copy" data-target="oauth1-token">Copy</button>
-                    </div>
-                </div>
-                <div class="token-field">
-                    <label>Token Secret</label>
-                    <div class="token-value-row">
-                        <input type="text" id="oauth1-secret" readonly>
-                        <button class="btn btn-copy" data-target="oauth1-secret">Copy</button>
-                    </div>
-                </div>
-            </div>
-
-            <div class="token-group" id="oauth2-group">
-                <h3>OAuth2 Token</h3>
-                <div class="token-field">
-                    <label>Access Token</label>
-                    <div class="token-value-row">
-                        <textarea id="oauth2-access" readonly rows="3"></textarea>
-                        <button class="btn btn-copy" data-target="oauth2-access">Copy</button>
-                    </div>
-                </div>
-                <div class="token-field">
-                    <label>Refresh Token</label>
-                    <div class="token-value-row">
-                        <textarea id="oauth2-refresh" readonly rows="3"></textarea>
-                        <button class="btn btn-copy" data-target="oauth2-refresh">Copy</button>
-                    </div>
-                </div>
-                <div class="token-field">
-                    <label>Token Type</label>
-                    <div class="token-value-row">
-                        <input type="text" id="oauth2-type" readonly>
-                        <button class="btn btn-copy" data-target="oauth2-type">Copy</button>
-                    </div>
-                </div>
-                <div class="token-field">
-                    <label>Expires At</label>
-                    <div class="token-value-row">
-                        <input type="text" id="oauth2-expires" readonly>
-                        <button class="btn btn-copy" data-target="oauth2-expires">Copy</button>
-                    </div>
-                </div>
-            </div>
-
+            <div id="token-container"></div>
             <div class="action-buttons">
+                <button id="copy-all-btn" class="btn btn-primary">Copy All (JSON)</button>
                 <button id="new-login-btn" class="btn btn-secondary">重新登入</button>
             </div>
         </div>
@@ -330,7 +281,10 @@
             else if (section === "token") tokenSection.classList.remove("hidden");
         }
 
+        let currentTokens = null;
+
         function displayTokens(data) {
+            // User info
             const userInfo = document.getElementById("user-info");
             userInfo.innerHTML = "";
             if (data.user) {
@@ -350,31 +304,104 @@
                 userInfo.textContent = "Authenticated";
             }
 
+            // Dynamic token rendering
             const tokens = data.tokens || {};
+            currentTokens = tokens;
+            const container = document.getElementById("token-container");
+            container.innerHTML = "";
 
-            const oauth1Group = document.getElementById("oauth1-group");
-            if (tokens.oauth1 && tokens.oauth1.oauth_token) {
-                oauth1Group.classList.remove("hidden");
-                document.getElementById("oauth1-token").value = tokens.oauth1.oauth_token || "";
-                document.getElementById("oauth1-secret").value = tokens.oauth1.oauth_token_secret || "";
-            } else {
-                oauth1Group.classList.add("hidden");
+            if (tokens.oauth1) {
+                container.appendChild(renderTokenGroup("OAuth1 Token", tokens.oauth1));
+            }
+            if (tokens.oauth2) {
+                container.appendChild(renderTokenGroup("OAuth2 Token", tokens.oauth2));
             }
 
-            const oauth2Group = document.getElementById("oauth2-group");
-            if (tokens.oauth2 && tokens.oauth2.access_token) {
-                oauth2Group.classList.remove("hidden");
-                document.getElementById("oauth2-access").value = tokens.oauth2.access_token || "";
-                document.getElementById("oauth2-refresh").value = tokens.oauth2.refresh_token || "";
-                document.getElementById("oauth2-type").value = tokens.oauth2.token_type || "";
-                document.getElementById("oauth2-expires").value = tokens.oauth2.expires_at
-                    ? new Date(tokens.oauth2.expires_at * 1000).toLocaleString()
-                    : "";
-            } else {
-                oauth2Group.classList.add("hidden");
-            }
+            // Bind copy buttons
+            container.querySelectorAll(".btn-copy").forEach((btn) => {
+                btn.addEventListener("click", () => {
+                    const target = document.getElementById(btn.dataset.target);
+                    const text = target.value;
+                    if (!text) return;
+                    navigator.clipboard.writeText(text).then(() => {
+                        const orig = btn.textContent;
+                        btn.textContent = "Copied!";
+                        setTimeout(() => { btn.textContent = orig; }, 1500);
+                    }).catch(() => {
+                        target.select();
+                        document.execCommand("copy");
+                        const orig = btn.textContent;
+                        btn.textContent = "Copied!";
+                        setTimeout(() => { btn.textContent = orig; }, 1500);
+                    });
+                });
+            });
 
             showSection("token");
+        }
+
+        function renderTokenGroup(title, tokenObj) {
+            const group = document.createElement("div");
+            group.className = "token-group";
+
+            const h3 = document.createElement("h3");
+            h3.textContent = title;
+            group.appendChild(h3);
+
+            for (const [key, value] of Object.entries(tokenObj)) {
+                if (value === null || value === undefined) continue;
+
+                const field = document.createElement("div");
+                field.className = "token-field";
+
+                const label = document.createElement("label");
+                label.textContent = key;
+                field.appendChild(label);
+
+                const row = document.createElement("div");
+                row.className = "token-value-row";
+
+                const displayValue = formatTokenValue(key, value);
+                const fieldId = "token-" + title.replace(/\s/g, "") + "-" + key;
+
+                if (String(displayValue).length > 80) {
+                    const ta = document.createElement("textarea");
+                    ta.id = fieldId;
+                    ta.readOnly = true;
+                    ta.rows = 3;
+                    ta.value = displayValue;
+                    row.appendChild(ta);
+                } else {
+                    const input = document.createElement("input");
+                    input.type = "text";
+                    input.id = fieldId;
+                    input.readOnly = true;
+                    input.value = displayValue;
+                    row.appendChild(input);
+                }
+
+                const copyBtn = document.createElement("button");
+                copyBtn.className = "btn btn-copy";
+                copyBtn.dataset.target = fieldId;
+                copyBtn.textContent = "Copy";
+                row.appendChild(copyBtn);
+
+                field.appendChild(row);
+                group.appendChild(field);
+            }
+
+            return group;
+        }
+
+        function formatTokenValue(key, value) {
+            const k = key.toLowerCase();
+            if ((k.includes("expires") || k === "expires_at" || k === "expiresat") && typeof value === "number") {
+                // Try both seconds and milliseconds
+                const ts = value > 1e12 ? value : value * 1000;
+                return new Date(ts).toLocaleString() + "  (" + value + ")";
+            }
+            if (typeof value === "object") return JSON.stringify(value);
+            return String(value);
         }
 
         // Login
@@ -475,26 +502,29 @@
             loginForm.reset();
             document.getElementById("mfa-code").value = "";
             mfaSession = null;
+            currentTokens = null;
             showSection("login");
         });
 
-        // Copy buttons
-        document.querySelectorAll(".btn-copy").forEach((btn) => {
-            btn.addEventListener("click", () => {
-                const target = document.getElementById(btn.dataset.target);
-                const text = target.value;
-                if (!text) return;
-                navigator.clipboard.writeText(text).then(() => {
-                    const orig = btn.textContent;
-                    btn.textContent = "Copied!";
-                    setTimeout(() => { btn.textContent = orig; }, 1500);
-                }).catch(() => {
-                    target.select();
-                    document.execCommand("copy");
-                    const orig = btn.textContent;
-                    btn.textContent = "Copied!";
-                    setTimeout(() => { btn.textContent = orig; }, 1500);
-                });
+        // Copy All as JSON
+        document.getElementById("copy-all-btn").addEventListener("click", () => {
+            if (!currentTokens) return;
+            const json = JSON.stringify(currentTokens, null, 2);
+            navigator.clipboard.writeText(json).then(() => {
+                const btn = document.getElementById("copy-all-btn");
+                btn.textContent = "Copied!";
+                setTimeout(() => { btn.textContent = "Copy All (JSON)"; }, 1500);
+            }).catch(() => {
+                // fallback
+                const ta = document.createElement("textarea");
+                ta.value = json;
+                document.body.appendChild(ta);
+                ta.select();
+                document.execCommand("copy");
+                document.body.removeChild(ta);
+                const btn = document.getElementById("copy-all-btn");
+                btn.textContent = "Copied!";
+                setTimeout(() => { btn.textContent = "Copy All (JSON)"; }, 1500);
             });
         });
     });
