@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "regions": ["icn1"],
+  "regions": ["cdg1"],
   "functions": {
     "api/**/*.js": {
       "maxDuration": 30,
