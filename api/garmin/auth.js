@@ -1,24 +1,5 @@
 const { GarminConnect } = require('garmin-connect');
 
-const sleep = (ms) => new Promise(r => setTimeout(r, ms));
-
-async function retryOn429(fn, log, maxRetries = 3) {
-    for (let i = 0; i <= maxRetries; i++) {
-        try {
-            return await fn();
-        } catch (e) {
-            const is429 = e.message && (e.message.includes('429') || e.message.toLowerCase().includes('too many'));
-            if (is429 && i < maxRetries) {
-                const delay = (i + 1) * 3000; // 3s, 6s, 9s
-                log(`429 rate limited, retry ${i + 1}/${maxRetries} after ${delay / 1000}s...`);
-                await sleep(delay);
-                continue;
-            }
-            throw e;
-        }
-    }
-}
-
 // Garmin auth endpoint with two-step MFA flow:
 //   Step 1: POST { email, password } → may return { needsMfa, mfaSession }
 //   Step 2: POST { mfaSession, mfaCode } → returns tokens
@@ -65,7 +46,7 @@ module.exports = async (req, res) => {
 
             try {
                 log('Calling GC.verifyMFA()...');
-                await retryOn429(() => GC.verifyMFA(mfaSession, mfaCode), log);
+                await GC.verifyMFA(mfaSession, mfaCode);
                 log('MFA verified successfully');
             } catch (e) {
                 log(`MFA error: ${e.message}`);
@@ -73,7 +54,9 @@ module.exports = async (req, res) => {
                 let errorMessage = 'MFA 驗證失敗';
                 let sessionExpired = false;
 
-                if (msg.includes('expired')) {
+                if (msg.includes('429') || msg.includes('too many')) {
+                    errorMessage = '請求過於頻繁，請等待幾分鐘後再試';
+                } else if (msg.includes('expired')) {
                     errorMessage = '驗證碼已過期（5 分鐘），請重新登入';
                     sessionExpired = true;
                 } else if (msg.includes('invalid') && msg.includes('session')) {
@@ -117,7 +100,7 @@ module.exports = async (req, res) => {
         log('GarminConnect instance created');
         log('Calling GC.login()...');
 
-        const loginResult = await retryOn429(() => GC.login(), log);
+        const loginResult = await GC.login();
 
         log(`Login returned: ${typeof loginResult}`);
         log(`Login result keys: ${loginResult ? Object.keys(loginResult).join(', ') : 'null'}`);

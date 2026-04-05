@@ -3,7 +3,7 @@
   "regions": ["hnd1"],
   "functions": {
     "api/**/*.js": {
-      "maxDuration": 60,
+      "maxDuration": 30,
       "memory": 1024
     }
   },
