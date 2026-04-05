@@ -2,8 +2,6 @@
   "version": 2,
   "cleanUrls": true,
   "trailingSlash": false,
-  "buildCommand": "",
-  "outputDirectory": ".",
   "functions": {
     "api/**/*.js": {
       "maxDuration": 30
