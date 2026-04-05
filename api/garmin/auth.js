@@ -187,8 +187,6 @@ module.exports = async (req, res) => {
                         'User-Agent': USER_AGENT,
                         Cookie: cookieString(cookies)
                     },
-                    maxRedirects: 0,
-                    validateStatus: s => s < 400
                 }
             );
 
@@ -277,10 +275,7 @@ module.exports = async (req, res) => {
                     Referer: SIGNIN_URL,
                     'User-Agent': USER_AGENT,
                     Cookie: cookieString(cookies)
-                },
-                maxRedirects: 0,
-                validateStatus: s => s < 400
-            }
+                }
         );
         Object.assign(cookies, extractCookies(step3Res));
 
