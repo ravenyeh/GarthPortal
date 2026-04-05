@@ -2,10 +2,11 @@
 
 import base64
 import json
+import os
 import pickle
 import traceback
 
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, send_from_directory
 
 import garth
 from garth.sso import (
@@ -15,6 +16,14 @@ from garth.sso import (
 )
 
 app = Flask(__name__)
+
+# Resolve path to public/ relative to this file (api/index.py -> ../public)
+PUBLIC_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "public")
+
+
+@app.route("/")
+def index():
+    return send_from_directory(PUBLIC_DIR, "index.html")
 
 
 def _serialize_client_state(client_state):
