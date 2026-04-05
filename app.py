@@ -3,20 +3,19 @@
 import os
 import traceback
 
-from flask import Flask, jsonify, render_template, request
+from flask import Flask, jsonify, render_template, request, send_from_directory
 
 from garmin_auth import GarminAuth
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder="public", template_folder="public")
 app.secret_key = os.urandom(24)
 
-# Per-session auth handler (simple single-user setup)
 auth_handler = GarminAuth()
 
 
 @app.route("/")
 def index():
-    return render_template("index.html")
+    return send_from_directory("public", "index.html")
 
 
 @app.route("/api/login", methods=["POST"])
@@ -51,24 +50,6 @@ def submit_mfa():
     except Exception as e:
         traceback.print_exc()
         return jsonify({"status": "error", "message": str(e)}), 401
-
-
-@app.route("/api/save-tokens", methods=["POST"])
-def save_tokens():
-    try:
-        result = auth_handler.save_tokens()
-        return jsonify(result)
-    except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
-
-
-@app.route("/api/load-tokens", methods=["POST"])
-def load_tokens():
-    try:
-        result = auth_handler.load_tokens()
-        return jsonify(result)
-    except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
 
 
 if __name__ == "__main__":
