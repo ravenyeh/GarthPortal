@@ -115,7 +115,9 @@ module.exports = async (req, res) => {
 
         if (error.message) {
             const msg = error.message.toLowerCase();
-            if (msg.includes('429') || msg.includes('too many')) {
+            if (msg.includes('mfa_secret_key')) {
+                errorMessage = '伺服器缺少 MFA_SECRET_KEY 環境變數，請在 Vercel 設定';
+            } else if (msg.includes('429') || msg.includes('too many')) {
                 errorMessage = '請求過於頻繁，請等待幾分鐘後再試';
             } else if (msg.includes('credentials') || msg.includes('password') || msg.includes('401')) {
                 errorMessage = 'Email 或密碼錯誤';
