@@ -1,13 +1,13 @@
-"""Flask web application for Garmin Connect authentication with MFA support."""
+"""Flask app for local development - Garmin Connect auth with MFA support."""
 
 import os
 import traceback
 
-from flask import Flask, jsonify, render_template, request, send_from_directory
+from flask import Flask, jsonify, request, send_from_directory
 
 from garmin_auth import GarminAuth
 
-app = Flask(__name__, static_folder="public", template_folder="public")
+app = Flask(__name__)
 app.secret_key = os.urandom(24)
 
 auth_handler = GarminAuth()
@@ -20,7 +20,7 @@ def index():
 
 @app.route("/api/login", methods=["POST"])
 def login():
-    data = request.get_json()
+    data = request.get_json() or {}
     email = data.get("email", "").strip()
     password = data.get("password", "")
     domain = data.get("domain", "garmin.com").strip()
@@ -38,7 +38,7 @@ def login():
 
 @app.route("/api/mfa", methods=["POST"])
 def submit_mfa():
-    data = request.get_json()
+    data = request.get_json() or {}
     mfa_code = data.get("mfa_code", "").strip()
 
     if not mfa_code:

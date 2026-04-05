@@ -257,7 +257,7 @@
             clearTimeout(statusTimeout);
             statusBar.textContent = message;
             statusBar.className = "status-bar " + type;
-            statusTimeout = setTimeout(() => statusBar.classList.add("hidden"), 4000);
+            statusTimeout = setTimeout(() => statusBar.classList.add("hidden"), 6000);
         }
 
         function setLoading(btn, loading) {
@@ -336,7 +336,8 @@
                     showStatus(data.message || "Login failed.", "error");
                 }
             } catch (err) {
-                showStatus("Network error. Please try again.", "error");
+                console.error("Login error:", err);
+                showStatus("Cannot connect to server: " + err.message, "error");
             } finally {
                 setLoading(loginBtn, false);
             }
@@ -368,7 +369,8 @@
                     showStatus(data.message || "MFA verification failed.", "error");
                 }
             } catch (err) {
-                showStatus("Network error. Please try again.", "error");
+                console.error("MFA error:", err);
+                showStatus("Cannot connect to server: " + err.message, "error");
             } finally {
                 setLoading(mfaBtn, false);
             }
