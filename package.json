@@ -1,0 +1,13 @@
+{
+  "name": "garth-portal",
+  "version": "1.0.0",
+  "description": "Garmin Connect Token Portal with MFA Support",
+  "private": true,
+  "scripts": {
+    "dev": "vercel dev",
+    "build": "echo 'Static site - no build required'"
+  },
+  "dependencies": {
+    "garmin-connect": "github:ravenyeh/garmin-connect"
+  }
+}

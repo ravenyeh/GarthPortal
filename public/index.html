@@ -76,6 +76,10 @@
         .info-box {
             background: #e8f5e9; border-radius: 8px; padding: 12px 16px;
             margin-bottom: 16px; font-size: 14px; color: #2e7d32;
+            display: flex; align-items: center; gap: 12px;
+        }
+        .info-box img {
+            width: 40px; height: 40px; border-radius: 50%;
         }
 
         .token-group { margin-bottom: 20px; }
@@ -129,54 +133,47 @@
     <div class="container">
         <header>
             <h1>Garmin Auth Portal</h1>
-            <p class="subtitle">Garmin Connect Token (Support MFA)</p>
+            <p class="subtitle">Garmin Connect Token（Support MFA）</p>
         </header>
 
         <!-- Login Form -->
         <div id="login-section" class="card">
-            <h2>Login</h2>
+            <h2>登入</h2>
             <form id="login-form">
                 <div class="form-group">
                     <label for="email">Email</label>
                     <input type="email" id="email" placeholder="your@email.com" required>
                 </div>
                 <div class="form-group">
-                    <label for="password">Password</label>
+                    <label for="password">密碼</label>
                     <input type="password" id="password" placeholder="Password" required>
                 </div>
-                <div class="form-group">
-                    <label for="domain">Domain</label>
-                    <select id="domain">
-                        <option value="garmin.com">garmin.com (Global)</option>
-                        <option value="garmin.cn">garmin.cn (China)</option>
-                    </select>
-                </div>
-                <button type="submit" id="login-btn" class="btn btn-primary">Login</button>
+                <button type="submit" id="login-btn" class="btn btn-primary">登入</button>
             </form>
         </div>
 
         <!-- MFA Section -->
         <div id="mfa-section" class="card hidden">
-            <h2>MFA Verification</h2>
-            <p class="mfa-hint">Please enter the verification code from your authenticator app or SMS.</p>
+            <h2>MFA 驗證</h2>
+            <p class="mfa-hint">請輸入 Garmin 傳送的驗證碼</p>
             <form id="mfa-form">
                 <div class="form-group">
-                    <label for="mfa-code">Verification Code</label>
-                    <input type="text" id="mfa-code" placeholder="6-digit code"
+                    <label for="mfa-code">驗證碼</label>
+                    <input type="text" id="mfa-code" placeholder="6 位數驗證碼"
                            maxlength="7" pattern="[0-9]*" inputmode="numeric"
                            required autocomplete="one-time-code">
                 </div>
-                <button type="submit" id="mfa-btn" class="btn btn-primary">Verify</button>
-                <button type="button" id="back-btn" class="btn btn-secondary">Back to Login</button>
+                <button type="submit" id="mfa-btn" class="btn btn-primary">驗證</button>
+                <button type="button" id="back-btn" class="btn btn-secondary">返回登入</button>
             </form>
         </div>
 
         <!-- Token Result Section -->
         <div id="token-section" class="card hidden">
-            <h2>Authentication Successful</h2>
+            <h2>登入成功</h2>
             <div id="user-info" class="info-box"></div>
 
-            <div class="token-group">
+            <div class="token-group" id="oauth1-group">
                 <h3>OAuth1 Token</h3>
                 <div class="token-field">
                     <label>Token</label>
@@ -194,7 +191,7 @@
                 </div>
             </div>
 
-            <div class="token-group">
+            <div class="token-group" id="oauth2-group">
                 <h3>OAuth2 Token</h3>
                 <div class="token-field">
                     <label>Access Token</label>
@@ -227,7 +224,7 @@
             </div>
 
             <div class="action-buttons">
-                <button id="new-login-btn" class="btn btn-secondary">New Login</button>
+                <button id="new-login-btn" class="btn btn-secondary">重新登入</button>
             </div>
         </div>
 
@@ -249,8 +246,7 @@
         const backBtn = document.getElementById("back-btn");
         const newLoginBtn = document.getElementById("new-login-btn");
 
-        // MFA client state (stored client-side for stateless serverless)
-        let clientState = null;
+        let mfaSession = null;
 
         let statusTimeout;
         function showStatus(message, type) {
@@ -264,7 +260,7 @@
             if (loading) {
                 btn.disabled = true;
                 btn.dataset.originalText = btn.textContent;
-                btn.innerHTML = '<span class="spinner"></span>Processing...';
+                btn.innerHTML = '<span class="spinner"></span>處理中...';
             } else {
                 btn.disabled = false;
                 btn.textContent = btn.dataset.originalText || btn.textContent;
@@ -282,24 +278,48 @@
 
         function displayTokens(data) {
             const userInfo = document.getElementById("user-info");
-            const parts = [];
-            if (data.display_name) parts.push("User: " + data.display_name);
-            if (data.domain) parts.push("Domain: " + data.domain);
-            userInfo.textContent = parts.join(" | ") || "Authenticated";
+            userInfo.innerHTML = "";
+            if (data.user) {
+                if (data.user.profileImageUrl) {
+                    const img = document.createElement("img");
+                    img.src = data.user.profileImageUrl;
+                    img.alt = "Profile";
+                    userInfo.appendChild(img);
+                }
+                const text = document.createElement("span");
+                const parts = [];
+                if (data.user.fullName) parts.push(data.user.fullName);
+                if (data.user.displayName) parts.push("@" + data.user.displayName);
+                text.textContent = parts.join(" ") || "Authenticated";
+                userInfo.appendChild(text);
+            } else {
+                userInfo.textContent = "Authenticated";
+            }
 
             const tokens = data.tokens || {};
-            if (tokens.oauth1) {
+
+            const oauth1Group = document.getElementById("oauth1-group");
+            if (tokens.oauth1 && tokens.oauth1.oauth_token) {
+                oauth1Group.classList.remove("hidden");
                 document.getElementById("oauth1-token").value = tokens.oauth1.oauth_token || "";
                 document.getElementById("oauth1-secret").value = tokens.oauth1.oauth_token_secret || "";
+            } else {
+                oauth1Group.classList.add("hidden");
             }
-            if (tokens.oauth2) {
+
+            const oauth2Group = document.getElementById("oauth2-group");
+            if (tokens.oauth2 && tokens.oauth2.access_token) {
+                oauth2Group.classList.remove("hidden");
                 document.getElementById("oauth2-access").value = tokens.oauth2.access_token || "";
                 document.getElementById("oauth2-refresh").value = tokens.oauth2.refresh_token || "";
                 document.getElementById("oauth2-type").value = tokens.oauth2.token_type || "";
                 document.getElementById("oauth2-expires").value = tokens.oauth2.expires_at
                     ? new Date(tokens.oauth2.expires_at * 1000).toLocaleString()
                     : "";
+            } else {
+                oauth2Group.classList.add("hidden");
             }
+
             showSection("token");
         }
 
@@ -308,36 +328,35 @@
             e.preventDefault();
             const email = document.getElementById("email").value.trim();
             const password = document.getElementById("password").value;
-            const domain = document.getElementById("domain").value;
 
             if (!email || !password) {
-                showStatus("Please fill in email and password.", "error");
+                showStatus("請填入 Email 和密碼", "error");
                 return;
             }
 
             setLoading(loginBtn, true);
             try {
-                const res = await fetch("/api/login", {
+                const res = await fetch("/api/garmin/auth", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ email, password, domain }),
+                    body: JSON.stringify({ email, password }),
                 });
                 const data = await res.json();
 
-                if (data.status === "mfa_required") {
-                    clientState = data.client_state;
-                    showStatus("MFA verification required.", "info");
+                if (data.needsMfa) {
+                    mfaSession = data.mfaSession;
+                    showStatus(data.message || "請輸入驗證碼", "info");
                     showSection("mfa");
                     document.getElementById("mfa-code").focus();
-                } else if (data.status === "success") {
-                    showStatus("Login successful!", "success");
+                } else if (data.success) {
+                    showStatus("登入成功！", "success");
                     displayTokens(data);
                 } else {
-                    showStatus(data.message || "Login failed.", "error");
+                    showStatus(data.error || "登入失敗", "error");
                 }
             } catch (err) {
                 console.error("Login error:", err);
-                showStatus("Cannot connect to server: " + err.message, "error");
+                showStatus("無法連線伺服器: " + err.message, "error");
             } finally {
                 setLoading(loginBtn, false);
             }
@@ -348,29 +367,33 @@
             e.preventDefault();
             const mfaCode = document.getElementById("mfa-code").value.trim();
             if (!mfaCode) {
-                showStatus("Please enter the verification code.", "error");
+                showStatus("請輸入驗證碼", "error");
                 return;
             }
 
             setLoading(mfaBtn, true);
             try {
-                const res = await fetch("/api/mfa", {
+                const res = await fetch("/api/garmin/auth", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ mfa_code: mfaCode, client_state: clientState }),
+                    body: JSON.stringify({ mfaSession, mfaCode }),
                 });
                 const data = await res.json();
 
-                if (data.status === "success") {
-                    showStatus("MFA verified! Tokens retrieved.", "success");
+                if (data.success) {
+                    showStatus("驗證成功！Token 已取得", "success");
                     displayTokens(data);
-                    clientState = null;
+                    mfaSession = null;
                 } else {
-                    showStatus(data.message || "MFA verification failed.", "error");
+                    showStatus(data.error || "MFA 驗證失敗", "error");
+                    if (data.sessionExpired) {
+                        mfaSession = null;
+                        showSection("login");
+                    }
                 }
             } catch (err) {
                 console.error("MFA error:", err);
-                showStatus("Cannot connect to server: " + err.message, "error");
+                showStatus("無法連線伺服器: " + err.message, "error");
             } finally {
                 setLoading(mfaBtn, false);
             }
@@ -378,14 +401,14 @@
 
         backBtn.addEventListener("click", () => {
             document.getElementById("mfa-code").value = "";
-            clientState = null;
+            mfaSession = null;
             showSection("login");
         });
 
         newLoginBtn.addEventListener("click", () => {
             loginForm.reset();
             document.getElementById("mfa-code").value = "";
-            clientState = null;
+            mfaSession = null;
             showSection("login");
         });
 
@@ -396,15 +419,15 @@
                 const text = target.value;
                 if (!text) return;
                 navigator.clipboard.writeText(text).then(() => {
-                    const original = btn.textContent;
+                    const orig = btn.textContent;
                     btn.textContent = "Copied!";
-                    setTimeout(() => { btn.textContent = original; }, 1500);
+                    setTimeout(() => { btn.textContent = orig; }, 1500);
                 }).catch(() => {
                     target.select();
                     document.execCommand("copy");
-                    const original = btn.textContent;
+                    const orig = btn.textContent;
                     btn.textContent = "Copied!";
-                    setTimeout(() => { btn.textContent = original; }, 1500);
+                    setTimeout(() => { btn.textContent = orig; }, 1500);
                 });
             });
         });
