@@ -187,10 +187,11 @@ module.exports = async (req, res) => {
                         'User-Agent': USER_AGENT,
                         Cookie: cookieString(cookies)
                     },
+                    responseType: 'text'
                 }
             );
 
-            const mfaHtml = typeof mfaRes.data === 'string' ? mfaRes.data : '';
+            const mfaHtml = mfaRes.data || '';
             // Merge any new cookies
             Object.assign(cookies, extractCookies(mfaRes));
 
@@ -233,7 +234,8 @@ module.exports = async (req, res) => {
         const step1Params = { clientId: 'GarminConnect', locale: 'en', service: GC_MODERN };
         const step1Url = `${SSO_EMBED}?${qs.stringify(step1Params)}`;
         const step1Res = await axios.get(step1Url, {
-            headers: { 'User-Agent': USER_AGENT }
+            headers: { 'User-Agent': USER_AGENT },
+            responseType: 'text'
         });
         Object.assign(cookies, extractCookies(step1Res));
 
@@ -244,7 +246,8 @@ module.exports = async (req, res) => {
             headers: {
                 'User-Agent': USER_AGENT,
                 Cookie: cookieString(cookies)
-            }
+            },
+            responseType: 'text'
         });
         Object.assign(cookies, extractCookies(step2Res));
 
@@ -275,11 +278,13 @@ module.exports = async (req, res) => {
                     Referer: SIGNIN_URL,
                     'User-Agent': USER_AGENT,
                     Cookie: cookieString(cookies)
-                }
+                },
+                responseType: 'text'
+            }
         );
         Object.assign(cookies, extractCookies(step3Res));
 
-        const html = typeof step3Res.data === 'string' ? step3Res.data : '';
+        const html = step3Res.data || '';
 
         // Check MFA
         if (detectMFA(html)) {
