@@ -115,7 +115,9 @@ module.exports = async (req, res) => {
 
         if (error.message) {
             const msg = error.message.toLowerCase();
-            if (msg.includes('credentials') || msg.includes('password') || msg.includes('401')) {
+            if (msg.includes('429') || msg.includes('too many')) {
+                errorMessage = '請求過於頻繁，請等待幾分鐘後再試';
+            } else if (msg.includes('credentials') || msg.includes('password') || msg.includes('401')) {
                 errorMessage = 'Email 或密碼錯誤';
             } else if (msg.includes('captcha') || msg.includes('robot')) {
                 errorMessage = 'Garmin 需要驗證碼，請稍後再試';
